@@ -23,6 +23,11 @@ inputs:
     description: "Name of the artifact to download"
     required: true
 
+outputs:
+  file-contents:
+    value: ${{ steps.download-artifact.outputs.file-contents }}
+    description: "Contents of the downloaded file"
+
 runs:
   using: composite
   steps:
@@ -83,14 +88,15 @@ runs:
 
         echo "=== Download Complete ==="
 
-        # Copy all files from artifact to CloudBees outputs (strip extensions)
-        for file in $(find . -type f); do
-          filename=$(basename "$file")
-          # Strip file extension for CloudBees output name
-          output_name=$(echo "$filename" | sed 's/\.[^.]*$//')
-          echo "Copying $file to outputs as: ${output_name}"
-          cp "$file" "$CLOUDBEES_OUTPUTS/${output_name}"
-        done
+        # Find the first file and copy it to fixed output name
+        FIRST_FILE=$(find . -type f | head -n 1)
+        if [ -n "$FIRST_FILE" ]; then
+          echo "Copying $FIRST_FILE to file-contents output"
+          cp "$FIRST_FILE" "$CLOUDBEES_OUTPUTS/file-contents"
+        else
+          echo "No files found in artifact"
+          exit 1
+        fi
 
       env:
         GITHUB_API_URL: ${{ inputs.github-api-url }}
