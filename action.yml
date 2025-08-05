@@ -83,11 +83,13 @@ runs:
 
         echo "=== Download Complete ==="
 
-        # Copy all files from artifact to CloudBees outputs
+        # Copy all files from artifact to CloudBees outputs (strip extensions)
         for file in $(find . -type f); do
           filename=$(basename "$file")
-          echo "Copying $file to outputs as: ${filename}"
-          cp "$file" "$CLOUDBEES_OUTPUTS/${filename}"
+          # Strip file extension for CloudBees output name
+          output_name=$(echo "$filename" | sed 's/\.[^.]*$//')
+          echo "Copying $file to outputs as: ${output_name}"
+          cp "$file" "$CLOUDBEES_OUTPUTS/${output_name}"
         done
 
       env:
