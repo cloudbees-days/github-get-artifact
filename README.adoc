@@ -50,7 +50,7 @@ Download artifacts from GitHub Actions workflow runs and make them available in 
 [source,yaml]
 ----
 - name: Download GitHub artifact
-  uses: ./github-get-artifact
+  uses: https://github.com/cloudbees-days/github-get-artifact
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     org-name: "my-org"
