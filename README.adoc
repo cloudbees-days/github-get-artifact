@@ -1,0 +1,60 @@
+= CloudBees action: GitHub Get Artifact
+
+Download artifacts from GitHub Actions workflow runs and make them available in CloudBees workflows.
+
+== Inputs
+
+[cols="2a,2a,2a,5a",options="header"]
+.Input details
+|===
+
+| Input name
+| Data type
+| Required?
+| Description
+
+| `github-api-url`
+| String
+| No
+| GitHub API URL. Default is `https://api.github.com`
+
+| `github-token`
+| String
+| Yes
+| GitHub token with repo access
+
+| `org-name`
+| String
+| Yes
+| GitHub organization or user name
+
+| `repo-name`
+| String
+| Yes
+| GitHub repository name
+
+| `run-id`
+| String
+| Yes
+| GitHub Actions workflow run ID
+
+| `artifact-name`
+| String
+| Yes
+| Name of the artifact to download
+
+|===
+
+== Usage Example
+
+[source,yaml]
+----
+- name: Download GitHub artifact
+  uses: ./github-get-artifact
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    org-name: "my-org"
+    repo-name: "my-repo"
+    run-id: "12345678"
+    artifact-name: "build-results"
+----

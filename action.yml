@@ -1,0 +1,99 @@
+apiVersion: automation.cloudbees.io/v1alpha1
+kind: action
+name: github-get-artifact
+description: "Download an artifact from a GitHub Actions workflow run"
+inputs:
+  github-api-url:
+    description: "GitHub API URL"
+    required: false
+    default: "https://api.github.com"
+  github-token:
+    description: "GitHub token with repo access"
+    required: true
+  org-name:
+    description: "GitHub organization or user name"
+    required: true
+  repo-name:
+    description: "GitHub repository name"
+    required: true
+  run-id:
+    description: "GitHub Actions workflow run ID"
+    required: true
+  artifact-name:
+    description: "Name of the artifact to download"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: download-artifact
+      name: Download GitHub Actions Artifact
+      uses: docker://alpine:3.18
+      shell: sh
+      run: |
+        set -e
+
+        # Install required packages in this container
+        apk add --no-cache curl jq unzip
+
+        echo "=== GitHub Artifact Download ==="
+        echo "Repository: ${ORG_NAME}/${REPO_NAME}"
+        echo "Run ID: ${RUN_ID}"
+        echo "Artifact: ${ARTIFACT_NAME}"
+
+        # Create working directory in current path
+        WORK_DIR="./artifact-download"
+        mkdir -p "${WORK_DIR}"
+
+        # List artifacts for the workflow run
+        echo "Fetching artifacts list..."
+        ARTIFACTS_RESPONSE=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "${GITHUB_API_URL}/repos/${ORG_NAME}/${REPO_NAME}/actions/runs/${RUN_ID}/artifacts")
+
+        # Find the specific artifact by name
+        ARTIFACT_ID=$(echo "${ARTIFACTS_RESPONSE}" | jq -r --arg name "${ARTIFACT_NAME}" '.artifacts[] | select(.name == $name) | .id')
+
+        if [ -z "${ARTIFACT_ID}" ] || [ "${ARTIFACT_ID}" = "null" ]; then
+          echo "Error: Artifact '${ARTIFACT_NAME}' not found in workflow run ${RUN_ID}"
+          echo "Available artifacts:"
+          echo "${ARTIFACTS_RESPONSE}" | jq -r '.artifacts[].name'
+          exit 1
+        fi
+
+        echo "Found artifact with ID: ${ARTIFACT_ID}"
+
+        # Download the artifact zip file
+        echo "Downloading artifact..."
+        curl -L -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -o "${WORK_DIR}/artifact.zip" \
+          "${GITHUB_API_URL}/repos/${ORG_NAME}/${REPO_NAME}/actions/artifacts/${ARTIFACT_ID}/zip"
+
+        # Get artifact size
+        ARTIFACT_SIZE=$(stat -c%s "${WORK_DIR}/artifact.zip" 2>/dev/null || stat -f%z "${WORK_DIR}/artifact.zip")
+
+        # Extract the zip file
+        echo "Extracting artifact..."
+        cd "${WORK_DIR}"
+        unzip -q artifact.zip
+        rm artifact.zip
+
+        echo "=== Download Complete ==="
+
+        # Copy all files from artifact to CloudBees outputs
+        for file in $(find . -type f); do
+          filename=$(basename "$file")
+          echo "Copying $file to outputs as: ${filename}"
+          cp "$file" "$CLOUDBEES_OUTPUTS/${filename}"
+        done
+
+      env:
+        GITHUB_API_URL: ${{ inputs.github-api-url }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ORG_NAME: ${{ inputs.org-name }}
+        REPO_NAME: ${{ inputs.repo-name }}
+        RUN_ID: ${{ inputs.run-id }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
